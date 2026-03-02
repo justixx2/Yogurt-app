@@ -35,133 +35,168 @@ export default function Archive() {
 
   return (
     <div className="page archive">
-      <h1>Bacteria & Strain Archive</h1>
-      <p className="page-description">
-        Browse the scientific database of bacteria species, strains, benefits,
-        synergies, and supplement compatibility.
-      </p>
+      <div className="page-header">
+        <h1>Archive</h1>
+        <p className="page-subtitle">
+          Explore bacteria species, strains, and their properties
+        </p>
+      </div>
+
+      {/* Back button when viewing detail */}
+      {(currentStrain || selectedSpecies) && (
+        <div style={{ padding: "0 16px 8px" }}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => {
+              if (currentStrain) {
+                setSelectedStrain(null);
+              } else {
+                setSelectedSpecies(null);
+              }
+            }}
+            style={{ padding: "8px 16px", fontSize: "0.8125rem" }}
+          >
+            &larr; Back
+          </button>
+        </div>
+      )}
 
       <div className="archive-layout">
-        {/* Sidebar */}
-        <aside className="archive-sidebar">
-          <div className="search-box">
-            <input
-              type="text"
-              placeholder="Search species, strains, benefits..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
+        {/* Browse list — visible when no detail selected */}
+        {!currentStrain && !selectedSpecies && (
+          <div className="archive-sidebar">
+            <div className="search-box">
+              <input
+                type="text"
+                placeholder="Search species, strains..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
 
-          <div className="species-list">
-            {Object.entries(speciesGroups).map(([speciesName, group]) => (
-              <div key={speciesName} className="species-group">
-                <button
-                  className={`species-btn ${selectedSpecies === speciesName ? "active" : ""}`}
-                  onClick={() => {
-                    setSelectedSpecies(
-                      selectedSpecies === speciesName ? null : speciesName
-                    );
-                    setSelectedStrain(null);
-                  }}
-                >
-                  <span className="species-name">{speciesName}</span>
-                  <span className="strain-count">
-                    {group.strains.length} strain
-                    {group.strains.length !== 1 ? "s" : ""}
-                  </span>
-                </button>
-
-                {selectedSpecies === speciesName && (
-                  <div className="strain-list">
-                    {group.strains.map((item) => (
-                      <button
-                        key={item.strainName}
-                        className={`strain-btn ${selectedStrain === item ? "active" : ""}`}
-                        onClick={() => setSelectedStrain(item)}
-                      >
-                        {item.strainName}
-                      </button>
-                    ))}
-                  </div>
-                )}
+            {/* Quick stats */}
+            <div className="stat-row" style={{ marginBottom: 16 }}>
+              <div className="stat highlight">
+                <span className="stat-value">
+                  {Object.keys(database).length}
+                </span>
+                <span className="stat-label">Species</span>
               </div>
-            ))}
-          </div>
-        </aside>
-
-        {/* Main Content */}
-        <main className="archive-content">
-          {!currentStrain && !selectedSpecies && (
-            <div className="empty-state">
-              <h2>Select a species or strain</h2>
-              <p>
-                Browse the sidebar to explore bacteria species and their strains.
-                Each strain page shows detailed biological information, consumption
-                guidance, synergies, and supplement compatibility.
-              </p>
-              <div className="quick-stats">
-                <div className="stat">
-                  <span className="stat-value">
-                    {Object.keys(database).length}
-                  </span>
-                  <span className="stat-label">Species</span>
-                </div>
-                <div className="stat">
-                  <span className="stat-value">{allStrains.length}</span>
-                  <span className="stat-label">Strains</span>
-                </div>
+              <div className="stat">
+                <span className="stat-value">{allStrains.length}</span>
+                <span className="stat-label">Strains</span>
               </div>
             </div>
-          )}
 
-          {selectedSpecies && !currentStrain && (
+            <div className="species-list">
+              {Object.entries(speciesGroups).map(([speciesName, group]) => (
+                <div key={speciesName} className="species-group">
+                  <button
+                    className={`species-btn ${selectedSpecies === speciesName ? "active" : ""}`}
+                    onClick={() => {
+                      setSelectedSpecies(
+                        selectedSpecies === speciesName ? null : speciesName
+                      );
+                      setSelectedStrain(null);
+                    }}
+                  >
+                    <span className="species-name">{speciesName}</span>
+                    <span className="strain-count">
+                      {group.strains.length}
+                    </span>
+                  </button>
+
+                  {selectedSpecies === speciesName && (
+                    <div className="strain-list">
+                      {group.strains.map((item) => (
+                        <button
+                          key={item.strainName}
+                          className={`strain-btn ${selectedStrain === item ? "active" : ""}`}
+                          onClick={() => setSelectedStrain(item)}
+                        >
+                          {item.strainName}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Species overview */}
+        {selectedSpecies && !currentStrain && (
+          <div className="archive-sidebar">
             <SpeciesOverview
               species={speciesGroups[selectedSpecies]?.species}
               speciesName={selectedSpecies}
+              strains={speciesGroups[selectedSpecies]?.strains || []}
+              onSelectStrain={setSelectedStrain}
+              selectedStrain={selectedStrain}
             />
-          )}
+          </div>
+        )}
 
-          {currentStrain && (
+        {/* Strain detail */}
+        {currentStrain && (
+          <main className="archive-content">
             <StrainDetail
               strain={currentStrain.strain}
               strainName={currentStrain.strainName}
               speciesName={currentStrain.speciesName}
             />
-          )}
-        </main>
+          </main>
+        )}
       </div>
     </div>
   );
 }
 
-function SpeciesOverview({ species, speciesName }) {
+function SpeciesOverview({ species, speciesName, strains, onSelectStrain, selectedStrain }) {
   if (!species) return null;
   return (
     <div className="species-overview">
-      <h2>{speciesName}</h2>
-      <div className="info-grid">
-        <div className="info-item">
-          <span className="info-label">Genus</span>
-          <span className="info-value">{species.genus}</span>
+      <div className="card" style={{ margin: "0 0 16px" }}>
+        <h2 style={{ fontStyle: "italic" }}>{speciesName}</h2>
+        <div className="info-grid">
+          <div className="info-item">
+            <span className="info-label">Genus</span>
+            <span className="info-value">{species.genus}</span>
+          </div>
+          <div className="info-item">
+            <span className="info-label">Gram Stain</span>
+            <span className="info-value">{species.grampStain}</span>
+          </div>
+          <div className="info-item">
+            <span className="info-label">Shape</span>
+            <span className="info-value">{species.shape}</span>
+          </div>
+          <div className="info-item">
+            <span className="info-label">Oxygen</span>
+            <span className="info-value">{species.oxygenRequirement}</span>
+          </div>
         </div>
-        <div className="info-item">
-          <span className="info-label">Gram Stain</span>
-          <span className="info-value">{species.grampStain}</span>
-        </div>
-        <div className="info-item">
-          <span className="info-label">Shape</span>
-          <span className="info-value">{species.shape}</span>
-        </div>
-        <div className="info-item">
-          <span className="info-label">Oxygen</span>
-          <span className="info-value">{species.oxygenRequirement}</span>
-        </div>
+        {species.generalDescription && (
+          <div className="info-box">
+            <p>{species.generalDescription}</p>
+          </div>
+        )}
       </div>
-      <div className="info-box">
-        <p>{species.generalDescription}</p>
+
+      <h3 style={{ padding: "0 4px", marginBottom: 10 }}>Strains</h3>
+      <div className="species-list">
+        {strains.map((item) => (
+          <button
+            key={item.strainName}
+            className={`species-btn ${selectedStrain === item ? "active" : ""}`}
+            onClick={() => onSelectStrain(item)}
+          >
+            <span style={{ fontWeight: 700 }}>{item.strainName}</span>
+            <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>&rarr;</span>
+          </button>
+        ))}
       </div>
-      <p className="hint-text">Select a strain from the sidebar for detailed information.</p>
     </div>
   );
 }
@@ -169,19 +204,20 @@ function SpeciesOverview({ species, speciesName }) {
 function StrainDetail({ strain, strainName, speciesName }) {
   return (
     <div className="strain-detail">
-      <div className="strain-header">
-        <h2>{strainName}</h2>
-        <span className="species-tag">{speciesName}</span>
-        {strain.alternateNames?.length > 0 && (
-          <span className="alt-names">
-            Also known as: {strain.alternateNames.join(", ")}
-          </span>
-        )}
-      </div>
-
-      <div className="info-item">
-        <span className="info-label">Origin</span>
-        <span className="info-value">{strain.origin}</span>
+      <div className="card" style={{ textAlign: "center" }}>
+        <div className="strain-header" style={{ marginBottom: 0 }}>
+          <h2>{strainName}</h2>
+          <span className="species-tag">{speciesName}</span>
+          {strain.alternateNames?.length > 0 && (
+            <span className="alt-names">
+              AKA: {strain.alternateNames.join(", ")}
+            </span>
+          )}
+          <div className="info-item" style={{ marginTop: 12, textAlign: "left" }}>
+            <span className="info-label">Origin</span>
+            <span className="info-value">{strain.origin}</span>
+          </div>
+        </div>
       </div>
 
       {/* Benefits */}

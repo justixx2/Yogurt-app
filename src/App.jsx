@@ -29,7 +29,6 @@ function App() {
       <BrowserRouter basename="/Yogurt-app">
         <GitHubPagesRedirect />
         <div className="app">
-          <Navigation />
           <div className="app-content">
             <Routes>
               <Route path="/" element={<RecipeBuilder />} />
@@ -37,6 +36,7 @@ function App() {
               <Route path="/data" element={<DataManager />} />
             </Routes>
           </div>
+          <Navigation />
         </div>
       </BrowserRouter>
     </DatabaseProvider>

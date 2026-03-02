@@ -1,25 +1,23 @@
 import { getCompatibilityInfo } from "../utils/fermentation";
 
-const statusIcons = {
-  check: "\u2713",
-  warning: "\u26A0",
-  cross: "\u2717"
+const bgColors = {
+  "#22c55e": "#dcfce7",
+  "#84cc16": "#ecfccb",
+  "#f59e0b": "#fef3c7",
+  "#ef4444": "#fee2e2"
 };
 
 export default function CompatibilityBadge({ status, showLabel = true }) {
   const info = getCompatibilityInfo(status);
-  const icon = statusIcons[info.emoji] || "";
 
   return (
     <span
       className="compatibility-badge"
       style={{
         color: info.color,
-        borderColor: info.color,
-        backgroundColor: `${info.color}15`
+        backgroundColor: bgColors[info.color] || "#f0f2f8"
       }}
     >
-      <span className="badge-icon">{icon}</span>
       {showLabel && <span className="badge-label">{info.label}</span>}
     </span>
   );

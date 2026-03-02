@@ -85,17 +85,18 @@ export default function DataManager() {
 
   return (
     <div className="page data-manager">
-      <h1>Import / Export</h1>
-      <p className="page-description">
-        Export your bacteria database for backup or sharing. Import updated
-        archives to expand your knowledge system.
-      </p>
+      <div className="page-header">
+        <h1>Data</h1>
+        <p className="page-subtitle">
+          Export, import, or reset your bacteria database
+        </p>
+      </div>
 
       {/* Database Stats */}
       <section className="card">
-        <h2>Current Database</h2>
+        <h2>Database</h2>
         <div className="stat-row">
-          <div className="stat">
+          <div className="stat highlight">
             <span className="stat-value">{speciesCount}</span>
             <span className="stat-label">Species</span>
           </div>
@@ -110,8 +111,7 @@ export default function DataManager() {
             <div key={name} className="summary-item">
               <strong>{name}</strong>
               <span>
-                {Object.keys(species.strains).length} strains:{" "}
-                {Object.keys(species.strains).join(", ")}
+                {Object.keys(species.strains).length} strains
               </span>
             </div>
           ))}
@@ -121,37 +121,38 @@ export default function DataManager() {
       {/* Export */}
       <section className="card">
         <h2>Export</h2>
-        <p>Download your database in your preferred format.</p>
-        <div className="button-row">
-          <button className="btn btn-primary" onClick={handleExportJSON}>
-            Export as JSON
-          </button>
-          <button className="btn btn-secondary" onClick={handleExportCSV}>
-            Export Strains as CSV
-          </button>
-        </div>
+        <p style={{ fontSize: "0.8125rem", color: "#6b7280", marginBottom: 14 }}>
+          Download your database for backup
+        </p>
+        <button className="btn btn-primary btn-full" onClick={handleExportJSON} style={{ marginBottom: 10 }}>
+          Export as JSON
+        </button>
+        <button className="btn btn-secondary btn-full" onClick={handleExportCSV}>
+          Export as CSV
+        </button>
       </section>
 
       {/* Import */}
       <section className="card">
         <h2>Import</h2>
-        <p>
-          Import a previously exported JSON database file. You can choose to
-          merge with existing data or overwrite it.
+        <p style={{ fontSize: "0.8125rem", color: "#6b7280", marginBottom: 14 }}>
+          Import a JSON database file
         </p>
 
-        <div className="form-row">
-          <label className="checkbox-label">
+        <div className="toggle-row" style={{ paddingTop: 0 }}>
+          <span className="toggle-label" style={{ fontSize: "0.875rem" }}>Overwrite mode</span>
+          <label className="toggle-switch">
             <input
               type="checkbox"
               checked={overwriteMode}
               onChange={(e) => setOverwriteMode(e.target.checked)}
             />
-            <span>
-              Overwrite existing data (unchecked = merge, preserving existing entries)
-            </span>
+            <span className="toggle-slider"></span>
           </label>
         </div>
+        <p style={{ fontSize: "0.75rem", color: "#9ca3af", margin: "0 0 14px" }}>
+          {overwriteMode ? "Existing data will be replaced" : "New data will be merged with existing"}
+        </p>
 
         <div className="file-upload">
           <input
@@ -161,50 +162,53 @@ export default function DataManager() {
             onChange={handleImport}
             id="file-import"
           />
-          <label htmlFor="file-import" className="btn btn-primary">
-            Choose JSON File to Import
+          <label htmlFor="file-import" className="btn btn-primary btn-full">
+            Choose File to Import
           </label>
         </div>
       </section>
 
       {/* Status Messages */}
       {importStatus && (
-        <div className="info-box success">
-          <p>{importStatus}</p>
+        <div style={{ padding: "0 16px" }}>
+          <div className="info-box success">
+            <p>{importStatus}</p>
+          </div>
         </div>
       )}
       {importError && (
-        <div className="info-box error">
-          <p>{importError}</p>
+        <div style={{ padding: "0 16px" }}>
+          <div className="info-box error">
+            <p>{importError}</p>
+          </div>
         </div>
       )}
 
       {/* Reset */}
       <section className="card">
-        <h2>Reset Database</h2>
-        <p>
-          Reset the database to the built-in defaults. This will remove any
-          imported data.
+        <h2>Reset</h2>
+        <p style={{ fontSize: "0.8125rem", color: "#6b7280", marginBottom: 14 }}>
+          Restore the built-in default database
         </p>
         {!showResetConfirm ? (
           <button
-            className="btn btn-danger"
+            className="btn btn-danger btn-full"
             onClick={() => setShowResetConfirm(true)}
           >
             Reset to Defaults
           </button>
         ) : (
           <div className="confirm-box">
-            <p>
-              <strong>Are you sure?</strong> This will remove all imported data
-              and restore the default database.
+            <p style={{ margin: "0 0 12px", fontWeight: 600 }}>
+              This will remove all imported data. Continue?
             </p>
             <div className="button-row">
-              <button className="btn btn-danger" onClick={handleReset}>
+              <button className="btn btn-danger" style={{ flex: 1 }} onClick={handleReset}>
                 Yes, Reset
               </button>
               <button
                 className="btn btn-secondary"
+                style={{ flex: 1 }}
                 onClick={() => setShowResetConfirm(false)}
               >
                 Cancel

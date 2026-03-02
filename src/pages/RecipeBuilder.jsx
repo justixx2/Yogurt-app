@@ -140,27 +140,29 @@ export default function RecipeBuilder() {
 
   return (
     <div className="page recipe-builder">
-      <h1>Fermentation Recipe Builder</h1>
-      <p className="page-description">
-        Select a bacteria species, strain, and fermentation medium to generate
-        an optimized recipe with growth simulation.
-      </p>
+      <div className="page-header">
+        <h1>Recipe Builder</h1>
+        <p className="page-subtitle">
+          Build an optimized fermentation recipe with growth simulation
+        </p>
+      </div>
 
       {/* Step 1: Species & Strain Selection */}
       <section className="card">
-        <h2>1. Select Bacteria</h2>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Species</label>
-            <select value={selectedSpecies} onChange={handleSpeciesChange}>
-              <option value="">-- Select Species --</option>
-              {speciesList.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="section-title">
+          <span className="step-number">1</span>
+          <h2>Select Bacteria</h2>
+        </div>
+        <div className="form-group" style={{ marginBottom: 12 }}>
+          <label>Species</label>
+          <select value={selectedSpecies} onChange={handleSpeciesChange}>
+            <option value="">Choose species...</option>
+            {speciesList.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+        {selectedSpecies && (
           <div className="form-group">
             <label>Strain</label>
             <select
@@ -168,71 +170,84 @@ export default function RecipeBuilder() {
               onChange={handleStrainChange}
               disabled={!selectedSpecies}
             >
-              <option value="">-- Select Strain --</option>
+              <option value="">Choose strain...</option>
               {strainsList.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
+                <option key={s} value={s}>{s}</option>
               ))}
             </select>
           </div>
-        </div>
+        )}
       </section>
 
       {/* Step 2: Inoculation Settings */}
       {strainData && (
         <section className="card">
-          <h2>2. Inoculation</h2>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Capsule Strength (CFU)</label>
-              <select
-                value={capsuleStrength}
-                onChange={(e) => setCapsuleStrength(Number(e.target.value))}
-              >
-                <option value={500000000}>500 million</option>
-                <option value={1000000000}>1 billion</option>
-                <option value={2000000000}>2 billion</option>
-                <option value={5000000000}>5 billion</option>
-                <option value={10000000000}>10 billion</option>
-                <option value={50000000000}>50 billion</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Number of Capsules</label>
-              <select
-                value={capsuleCount}
-                onChange={(e) => setCapsuleCount(Number(e.target.value))}
-              >
-                {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Volume (mL)</label>
-              <select
-                value={volumeML}
-                onChange={(e) => setVolumeML(Number(e.target.value))}
-              >
-                <option value={500}>500 mL</option>
-                <option value={1000}>1 litre</option>
-                <option value={1500}>1.5 litres</option>
-                <option value={2000}>2 litres</option>
-              </select>
-            </div>
+          <div className="section-title">
+            <span className="step-number">2</span>
+            <h2>Inoculation</h2>
+          </div>
+          <div className="form-group" style={{ marginBottom: 12 }}>
+            <label>Capsule Strength</label>
+            <select
+              value={capsuleStrength}
+              onChange={(e) => setCapsuleStrength(Number(e.target.value))}
+            >
+              <option value={500000000}>500 million CFU</option>
+              <option value={1000000000}>1 billion CFU</option>
+              <option value={2000000000}>2 billion CFU</option>
+              <option value={5000000000}>5 billion CFU</option>
+              <option value={10000000000}>10 billion CFU</option>
+              <option value={50000000000}>50 billion CFU</option>
+            </select>
           </div>
 
-          <div className="form-row">
-            <label className="checkbox-label">
+          {/* Horizontal scroll for capsule count */}
+          <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", display: "block", marginBottom: 8 }}>
+            Capsules
+          </label>
+          <div className="pill-scroll">
+            {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
+              <button
+                key={n}
+                className={`pill-btn ${capsuleCount === n ? "active" : ""}`}
+                onClick={() => setCapsuleCount(n)}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+
+          {/* Volume pills */}
+          <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", display: "block", marginTop: 16, marginBottom: 8 }}>
+            Volume
+          </label>
+          <div className="pill-scroll">
+            {[
+              { v: 500, label: "500 mL" },
+              { v: 1000, label: "1 L" },
+              { v: 1500, label: "1.5 L" },
+              { v: 2000, label: "2 L" }
+            ].map(({ v, label }) => (
+              <button
+                key={v}
+                className={`pill-btn ${volumeML === v ? "active" : ""}`}
+                onClick={() => setVolumeML(v)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Starter toggle */}
+          <div className="toggle-row">
+            <span className="toggle-label">Starter culture</span>
+            <label className="toggle-switch">
               <input
                 type="checkbox"
                 checked={useStarter}
                 onChange={(e) => setUseStarter(e.target.checked)}
               />
-              <span>Use existing ferment as starter culture</span>
+              <span className="toggle-slider"></span>
             </label>
           </div>
 
@@ -241,20 +256,14 @@ export default function RecipeBuilder() {
               <strong>Starter Culture Mode</strong>
               <p>{strainData.fermentation.starterMode.notes}</p>
               <ul>
-                <li>
-                  Lag phase reduction:{" "}
-                  {strainData.fermentation.starterMode.lagPhaseReduction}%
-                </li>
-                <li>
-                  Fermentation time reduction:{" "}
-                  {strainData.fermentation.starterMode.timeReduction}%
-                </li>
+                <li>Lag phase reduction: {strainData.fermentation.starterMode.lagPhaseReduction}%</li>
+                <li>Fermentation time reduction: {strainData.fermentation.starterMode.timeReduction}%</li>
               </ul>
             </div>
           )}
 
-          <div className="stat-row">
-            <div className="stat">
+          <div className="stat-row" style={{ marginTop: 12 }}>
+            <div className="stat highlight">
               <span className="stat-label">Starting CFU</span>
               <span className="stat-value">
                 {formatCFU(capsuleStrength * capsuleCount)}
@@ -264,11 +273,17 @@ export default function RecipeBuilder() {
         </section>
       )}
 
-      {/* Step 3: Medium Selection */}
+      {/* Step 3: Medium Selection — horizontal swipeable */}
       {strainData && (
         <section className="card">
-          <h2>3. Select Fermentation Medium</h2>
-          <div className="medium-grid">
+          <div className="section-title">
+            <span className="step-number">3</span>
+            <h2>Fermentation Medium</h2>
+          </div>
+          <div className="swipe-hint">
+            <span className="swipe-hint-arrow">&larr;</span> Swipe to browse
+          </div>
+          <div className="medium-scroll">
             {mediumKeys.map((key) => {
               const medium = mediumProfiles[key];
               return (
@@ -279,13 +294,16 @@ export default function RecipeBuilder() {
                 >
                   <div className="medium-header">
                     <span className="medium-name">{medium.name}</span>
-                    <CompatibilityBadge status={medium.compatibility} />
                   </div>
+                  <CompatibilityBadge status={medium.compatibility} />
                   <div className="medium-ph">
-                    pH {medium.initialPH} → {medium.finalPH}
+                    pH {medium.initialPH} &rarr; {medium.finalPH}
                   </div>
                   <div className="medium-score">
-                    Score: {medium.compatibilityScore}/100
+                    {medium.compatibilityScore}/100
+                  </div>
+                  <div className="progress-bar" style={{ marginTop: 4 }}>
+                    <div className="progress-fill" style={{ width: `${medium.compatibilityScore}%` }}></div>
                   </div>
                 </button>
               );
@@ -300,51 +318,63 @@ export default function RecipeBuilder() {
         </section>
       )}
 
-      {/* Step 4: Optimal Parameters */}
+      {/* Step 4: Optimal Parameters — circular gauges */}
       {strainData && currentMedium && (
         <section className="card">
-          <h2>4. Optimal Fermentation Parameters</h2>
-          <div className="params-grid">
-            <div className="param">
-              <span className="param-label">Temperature</span>
-              <span className="param-value">
-                {strainData.fermentation.optimalTemp}°C
-              </span>
+          <div className="section-title">
+            <span className="step-number">4</span>
+            <h2>Parameters</h2>
+          </div>
+          <div className="params-scroll">
+            <div className="param-card">
+              <div className="param-circle">
+                <span className="param-value">
+                  {strainData.fermentation.optimalTemp}°
+                </span>
+              </div>
+              <span className="param-label">Temp</span>
               <span className="param-range">
-                Range: {strainData.fermentation.tempRange[0]}–
-                {strainData.fermentation.tempRange[1]}°C
+                {strainData.fermentation.tempRange[0]}–{strainData.fermentation.tempRange[1]}°C
               </span>
             </div>
-            <div className="param">
+            <div className="param-card">
+              <div className="param-circle">
+                <span className="param-value">
+                  {simulation?.optimalDuration || strainData.fermentation.optimalDuration}h
+                </span>
+              </div>
               <span className="param-label">Duration</span>
-              <span className="param-value">
-                {simulation?.optimalDuration || strainData.fermentation.optimalDuration}h
-              </span>
               <span className="param-range">
-                Range: {strainData.fermentation.durationRange[0]}–
-                {strainData.fermentation.durationRange[1]}h
+                {strainData.fermentation.durationRange[0]}–{strainData.fermentation.durationRange[1]}h
               </span>
             </div>
-            <div className="param">
+            <div className="param-card">
+              <div className="param-circle">
+                <span className="param-value" style={{ fontSize: "0.75rem" }}>
+                  {strainData.fermentation.oxygenRequirement.split(" ")[0]}
+                </span>
+              </div>
               <span className="param-label">Oxygen</span>
-              <span className="param-value">
-                {strainData.fermentation.oxygenRequirement}
-              </span>
             </div>
-            <div className="param">
-              <span className="param-label">Optimal pH</span>
-              <span className="param-value">
-                {strainData.fermentation.optimalPH[0]}–
-                {strainData.fermentation.optimalPH[1]}
-              </span>
+            <div className="param-card">
+              <div className="param-circle">
+                <span className="param-value">
+                  {strainData.fermentation.optimalPH[0]}–{strainData.fermentation.optimalPH[1]}
+                </span>
+              </div>
+              <span className="param-label">pH Range</span>
             </div>
-            <div className="param">
-              <span className="param-label">Initial pH</span>
-              <span className="param-value">{currentMedium.initialPH}</span>
+            <div className="param-card">
+              <div className="param-circle">
+                <span className="param-value">{currentMedium.initialPH}</span>
+              </div>
+              <span className="param-label">Start pH</span>
             </div>
-            <div className="param">
-              <span className="param-label">Expected Final pH</span>
-              <span className="param-value">{currentMedium.finalPH}</span>
+            <div className="param-card">
+              <div className="param-circle">
+                <span className="param-value">{currentMedium.finalPH}</span>
+              </div>
+              <span className="param-label">End pH</span>
             </div>
           </div>
         </section>
@@ -353,10 +383,12 @@ export default function RecipeBuilder() {
       {/* Step 5: Additives */}
       {currentMedium && currentMedium.additives && (
         <section className="card">
-          <h2>5. Recommended Additives</h2>
+          <div className="section-title">
+            <span className="step-number">5</span>
+            <h2>Additives</h2>
+          </div>
           <p className="section-desc">
-            Select additives to include in your recipe. Each shows its effect on{" "}
-            {strainData.name || selectedStrain} growth.
+            Tap to select additives for {strainData.name || selectedStrain}
           </p>
           <div className="additives-list">
             {currentMedium.additives.map((additive) => (
@@ -366,16 +398,9 @@ export default function RecipeBuilder() {
                 onClick={() => toggleAdditive(additive.name)}
               >
                 <div className="additive-header">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={selectedAdditives.includes(additive.name)}
-                      onChange={() => toggleAdditive(additive.name)}
-                    />
-                    <strong>{additive.name}</strong>
-                  </label>
+                  <strong>{additive.name}</strong>
                   <span className="boost-badge">
-                    +{additive.estimatedGrowthBoost}% growth
+                    +{additive.estimatedGrowthBoost}%
                   </span>
                 </div>
                 <div className="additive-amount">
@@ -396,56 +421,84 @@ export default function RecipeBuilder() {
       {/* Step 6: Growth Simulation */}
       {simulation && (
         <section className="card">
-          <h2>6. Growth Simulation</h2>
+          <div className="section-title">
+            <span className="step-number">6</span>
+            <h2>Growth Simulation</h2>
+          </div>
 
           <div className="stat-row">
             <div className="stat">
-              <span className="stat-label">Starting CFU</span>
+              <span className="stat-label">Start</span>
               <span className="stat-value">
                 {formatCFU(simulation.initialCFU)}
               </span>
             </div>
             <div className="stat highlight">
-              <span className="stat-label">Estimated Final CFU</span>
+              <span className="stat-label">Final CFU</span>
               <span className="stat-value">
                 {formatCFU(simulation.finalCFU)}
               </span>
             </div>
             {selectedAdditives.length > 0 && (
               <div className="stat">
-                <span className="stat-label">Boost Factor</span>
+                <span className="stat-label">Boost</span>
                 <span className="stat-value">
-                  {((simulation.boostFactor - 1) * 100).toFixed(0)}% increase
+                  +{((simulation.boostFactor - 1) * 100).toFixed(0)}%
                 </span>
               </div>
             )}
           </div>
 
-          <div className="chart-container">
-            <h3>Bacterial Growth Curve</h3>
+          {/* Bar chart visualization */}
+          <h3>Growth Timeline</h3>
+          <div className="growth-bars">
+            {simulation.growthCurve.map((point) => {
+              const maxCFU = simulation.growthCurve[simulation.growthCurve.length - 1]?.cfu || 1;
+              const logMax = Math.log10(Math.max(1, maxCFU));
+              const logMin = Math.log10(Math.max(1, simulation.growthCurve[0]?.cfu || 1));
+              const logVal = Math.log10(Math.max(1, point.cfu));
+              const heightPct = Math.max(3, ((logVal - logMin) / (logMax - logMin || 1)) * 100);
+              let phase = "lag";
+              if (point.hour > simulation.lagPhaseHours + 2) phase = "log";
+              if (point.hour > strainData.fermentation.stationaryPhaseStart) phase = "stationary";
+              return (
+                <div key={point.hour} className="growth-bar-item">
+                  <div className="growth-bar-value">{formatCFU(point.cfu)}</div>
+                  <div
+                    className={`growth-bar phase-${phase}`}
+                    style={{ height: `${heightPct}%` }}
+                  ></div>
+                  <div className="growth-bar-label">{point.hour}h</div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Line chart */}
+          <div className="chart-container" style={{ marginTop: 20 }}>
+            <h3>Detailed Growth Curve</h3>
             <GrowthChart
               data={simulation.growthCurve}
               comparisonData={simulation.baseCurve}
-              width={Math.min(700, typeof window !== "undefined" ? window.innerWidth - 80 : 700)}
-              height={300}
+              width={Math.min(440, typeof window !== "undefined" ? window.innerWidth - 72 : 440)}
+              height={240}
             />
           </div>
 
           {/* Growth timeline table */}
           <div className="table-container">
-            <h3>Growth Timeline</h3>
             <table>
               <thead>
                 <tr>
                   <th>Time</th>
-                  <th>Estimated CFU</th>
+                  <th>Est. CFU</th>
                   <th>Phase</th>
                 </tr>
               </thead>
               <tbody>
                 {simulation.growthCurve.map((point) => {
                   let phase = "Lag";
-                  if (point.hour > simulation.lagPhaseHours + 2) phase = "Log (active growth)";
+                  if (point.hour > simulation.lagPhaseHours + 2) phase = "Log";
                   if (point.hour > strainData.fermentation.stationaryPhaseStart)
                     phase = "Stationary";
                   return (
@@ -453,7 +506,7 @@ export default function RecipeBuilder() {
                       <td>{point.hour}h</td>
                       <td>{formatCFU(point.cfu)}</td>
                       <td>
-                        <span className={`phase-tag phase-${phase.split(" ")[0].toLowerCase()}`}>
+                        <span className={`phase-tag phase-${phase.toLowerCase()}`}>
                           {phase}
                         </span>
                       </td>
@@ -467,20 +520,22 @@ export default function RecipeBuilder() {
           {/* Additive contributions */}
           {simulation.contributions.length > 0 && (
             <div className="contributions">
-              <h3>Additive Contributions</h3>
+              <h3>Additive Impact</h3>
               {simulation.contributions.map((c) => (
                 <div key={c.name} className="contribution-item">
                   <div className="contribution-header">
                     <strong>{c.name}</strong>
                     <span className="boost-badge">
-                      +{c.boostPercent}% ({formatCFU(c.additionalCFU)} additional CFU)
+                      +{c.boostPercent}%
                     </span>
                   </div>
                   <div className="contribution-detail">
                     <span className={`category-tag ${c.category.replace(/[\s/]+/g, "-")}`}>
                       {c.category}
                     </span>
-                    <span>{c.mechanism}</span>
+                  </div>
+                  <div style={{ fontSize: "0.8125rem", color: "#6b7280", marginTop: 4 }}>
+                    {formatCFU(c.additionalCFU)} additional CFU
                   </div>
                 </div>
               ))}
@@ -496,20 +551,21 @@ export default function RecipeBuilder() {
         </section>
       )}
 
-      {/* Medium Comparison Dashboard */}
+      {/* Medium Comparison — horizontal scrollable */}
       {strainData && mediumKeys.length > 1 && (
         <section className="card">
-          <h2>Medium Comparison</h2>
+          <h2>Compare Media</h2>
+          <div className="swipe-hint">
+            <span className="swipe-hint-arrow">&larr;</span> Swipe to compare
+          </div>
           <div className="table-container">
             <table>
               <thead>
                 <tr>
                   <th>Medium</th>
-                  <th>Compatibility</th>
                   <th>Score</th>
-                  <th>Initial pH</th>
-                  <th>Final pH</th>
-                  <th>Additives</th>
+                  <th>pH</th>
+                  <th>Add.</th>
                 </tr>
               </thead>
               <tbody>
@@ -522,13 +578,13 @@ export default function RecipeBuilder() {
                       onClick={() => handleMediumChange(key)}
                       style={{ cursor: "pointer" }}
                     >
-                      <td>{m.name}</td>
+                      <td style={{ fontWeight: 600 }}>{m.name}</td>
                       <td>
-                        <CompatibilityBadge status={m.compatibility} />
+                        <span style={{ fontWeight: 700, color: "#10b981" }}>
+                          {m.compatibilityScore}
+                        </span>
                       </td>
-                      <td>{m.compatibilityScore}/100</td>
-                      <td>{m.initialPH}</td>
-                      <td>{m.finalPH}</td>
+                      <td>{m.initialPH} &rarr; {m.finalPH}</td>
                       <td>{m.additives?.length || 0}</td>
                     </tr>
                   );
