@@ -8,7 +8,8 @@
 const CACHE_NAME = "yogurt-lab-v1";
 
 // Assets to pre-cache on install (shell)
-const PRECACHE_URLS = ["/", "/index.html", "/icon.svg", "/manifest.json"];
+const BASE = "/Yogurt-app/";
+const PRECACHE_URLS = [BASE, BASE + "index.html", BASE + "icon.svg", BASE + "manifest.json"];
 
 // Install: pre-cache the app shell
 self.addEventListener("install", (event) => {
@@ -48,7 +49,7 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           return response;
         })
-        .catch(() => caches.match("/index.html"))
+        .catch(() => caches.match(BASE + "index.html"))
     );
     return;
   }

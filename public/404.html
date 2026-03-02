@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Yogurt Lab</title>
+    <script>
+      // SPA redirect for GitHub Pages
+      // Converts the path into a query param so index.html can restore it
+      var repo = '/Yogurt-app';
+      var path = window.location.pathname;
+      if (path.startsWith(repo)) {
+        path = path.slice(repo.length);
+      }
+      window.location.replace(
+        repo + '/?route=' + encodeURIComponent(path + window.location.search)
+      );
+    </script>
+  </head>
+  <body></body>
+</html>
