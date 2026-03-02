@@ -1,0 +1,30 @@
+{
+  "name": "Yogurt Lab — Bacteria Fermentation Intelligence",
+  "short_name": "Yogurt Lab",
+  "description": "Optimize probiotic bacterial fermentation with strain-specific recipes, growth simulation, and a scientific strain archive.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0f1e",
+  "theme_color": "#0e7490",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
