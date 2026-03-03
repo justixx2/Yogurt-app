@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useDatabase } from "../context/DatabaseContext";
 import {
   generateGrowthCurve,
@@ -12,6 +12,21 @@ import CompatibilityBadge from "../components/CompatibilityBadge";
 import ArcGauge from "../components/ArcGauge";
 import MiniRing from "../components/MiniRing";
 
+const RECENT_KEY = "yogurt-recent-species";
+
+function getRecentSpecies() {
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
+  } catch { return []; }
+}
+
+function saveRecentSpecies(species) {
+  try {
+    const prev = getRecentSpecies().filter(s => s !== species);
+    localStorage.setItem(RECENT_KEY, JSON.stringify([species, ...prev].slice(0, 20)));
+  } catch {}
+}
+
 export default function RecipeBuilder() {
   const { database, getSpeciesList, getStrainsList, getStrain } = useDatabase();
 
@@ -24,6 +39,8 @@ export default function RecipeBuilder() {
   const [capsuleCount, setCapsuleCount] = useState(1);
   const [volumeML, setVolumeML] = useState(1000);
   const [simView, setSimView] = useState("bars");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [recentSpecies, setRecentSpecies] = useState(getRecentSpecies);
 
   const speciesList = getSpeciesList();
   const strainsList = selectedSpecies ? getStrainsList(selectedSpecies) : [];
@@ -35,18 +52,57 @@ export default function RecipeBuilder() {
   const mediumKeys = Object.keys(mediumProfiles);
   const currentMedium = mediumProfiles[selectedMedium] || null;
 
-  const handleSpeciesChange = (e) => {
-    setSelectedSpecies(e.target.value);
+  // Sort species: recently viewed first, then alphabetical
+  const sortedSpecies = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+
+    // Build flat list of {species, strain} for search
+    let filtered = speciesList;
+    if (q) {
+      // Match species name or any strain name within that species
+      filtered = speciesList.filter(sp => {
+        if (sp.toLowerCase().includes(q)) return true;
+        const strains = getStrainsList(sp);
+        return strains.some(st => st.toLowerCase().includes(q));
+      });
+    }
+
+    // Sort: recent first, then alphabetical
+    const recentSet = new Set(recentSpecies);
+    return [...filtered].sort((a, b) => {
+      const aRecent = recentSet.has(a);
+      const bRecent = recentSet.has(b);
+      if (aRecent && !bRecent) return -1;
+      if (!aRecent && bRecent) return 1;
+      if (aRecent && bRecent) {
+        return recentSpecies.indexOf(a) - recentSpecies.indexOf(b);
+      }
+      return a.localeCompare(b);
+    });
+  }, [speciesList, searchQuery, recentSpecies, getStrainsList]);
+
+  const handleSpeciesClick = useCallback((species) => {
+    if (selectedSpecies === species) {
+      // Clicking same species again deselects it
+      setSelectedSpecies("");
+      setSelectedStrain("");
+      setSelectedMedium("");
+      setSelectedAdditives([]);
+      return;
+    }
+    setSelectedSpecies(species);
     setSelectedStrain("");
     setSelectedMedium("");
     setSelectedAdditives([]);
-  };
+    saveRecentSpecies(species);
+    setRecentSpecies(getRecentSpecies());
+  }, [selectedSpecies]);
 
-  const handleStrainChange = (e) => {
-    setSelectedStrain(e.target.value);
+  const handleStrainClick = useCallback((strain) => {
+    setSelectedStrain(strain);
     setSelectedMedium("");
     setSelectedAdditives([]);
-  };
+  }, []);
 
   const handleMediumChange = (key) => {
     setSelectedMedium(key);
@@ -97,7 +153,6 @@ export default function RecipeBuilder() {
       timePoints
     });
 
-    // Base curve without additives for comparison
     const baseCurve = generateGrowthCurve({
       initialCFU,
       doublingTimeMin: ferm.doublingTimeMinutes,
@@ -141,46 +196,118 @@ export default function RecipeBuilder() {
     volumeML
   ]);
 
+  // Count how many strains match the search (for showing match hints)
+  const getMatchingStrains = useCallback((species) => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase().trim();
+    const strains = getStrainsList(species);
+    return strains.filter(s => s.toLowerCase().includes(q));
+  }, [searchQuery, getStrainsList]);
+
   return (
     <div className="page recipe-builder">
       <div className="page-header">
         <h1>Recipe Builder</h1>
         <p className="page-subtitle">
-          Build an optimized fermentation recipe with growth simulation
+          Tap a species, pick a strain — 1 tap each
         </p>
       </div>
 
-      {/* Step 1: Species & Strain Selection */}
-      <section className="card">
-        <div className="section-title">
-          <span className="step-number">1</span>
-          <h2>Select Bacteria</h2>
+      {/* Search bar — always at the top */}
+      <div className="card" style={{ paddingBottom: 14 }}>
+        <div className="search-box">
+          <input
+            type="text"
+            placeholder="Search bacteria species or strains..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
-        <div className="form-group" style={{ marginBottom: 12 }}>
-          <label>Species</label>
-          <select value={selectedSpecies} onChange={handleSpeciesChange}>
-            <option value="">Choose species...</option>
-            {speciesList.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
+
+        {/* Species list — all visible, single tap */}
+        <div className="species-pick-list">
+          {sortedSpecies.map((species) => {
+            const isSelected = selectedSpecies === species;
+            const isRecent = recentSpecies.includes(species);
+            const matchingStrains = getMatchingStrains(species);
+            const strains = getStrainsList(species);
+
+            return (
+              <div key={species} className="species-pick-group">
+                <button
+                  className={`species-pick-btn ${isSelected ? "active" : ""}`}
+                  onClick={() => handleSpeciesClick(species)}
+                >
+                  <div className="species-pick-left">
+                    {isRecent && <span className="recent-dot"></span>}
+                    <span className="species-pick-name">{species}</span>
+                  </div>
+                  <div className="species-pick-right">
+                    <span className="species-pick-count">{strains.length}</span>
+                    <span className={`species-pick-chevron ${isSelected ? "open" : ""}`}>
+                      &#8250;
+                    </span>
+                  </div>
+                </button>
+
+                {/* Strain pills — visible when species is selected */}
+                {isSelected && strains.length > 0 && (
+                  <div className="strain-pills">
+                    {strains.map((strain) => (
+                      <button
+                        key={strain}
+                        className={`strain-pill ${selectedStrain === strain ? "active" : ""}`}
+                        onClick={() => handleStrainClick(strain)}
+                      >
+                        {strain}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Show matching strains hint when searching */}
+                {!isSelected && matchingStrains.length > 0 && (
+                  <div className="strain-match-hint">
+                    Matches: {matchingStrains.join(", ")}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {sortedSpecies.length === 0 && (
+            <div className="empty-state" style={{ padding: "24px 0" }}>
+              <p>No species match "{searchQuery}"</p>
+            </div>
+          )}
         </div>
-        {selectedSpecies && (
-          <div className="form-group">
-            <label>Strain</label>
-            <select
-              value={selectedStrain}
-              onChange={handleStrainChange}
-              disabled={!selectedSpecies}
-            >
-              <option value="">Choose strain...</option>
-              {strainsList.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
+      </div>
+
+      {/* Selected bacteria summary */}
+      {strainData && (
+        <div className="card" style={{ padding: "14px 22px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              Selected
+            </div>
+            <div style={{ fontWeight: 800, fontSize: "1rem", color: "#1a1d26" }}>
+              {selectedStrain}
+            </div>
+            <div style={{ fontSize: "0.75rem", fontStyle: "italic", color: "#6b7280" }}>
+              {selectedSpecies}
+            </div>
           </div>
-        )}
-      </section>
+          <div style={{
+            width: 40, height: 40, borderRadius: "50%",
+            background: "linear-gradient(135deg, #10b981, #059669)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "white", fontWeight: 900, fontSize: "1.125rem",
+            boxShadow: "0 2px 8px rgba(16,185,129,0.3)"
+          }}>
+            {selectedStrain.charAt(0)}
+          </div>
+        </div>
+      )}
 
       {/* Step 2: Inoculation Settings */}
       {strainData && (
@@ -189,23 +316,31 @@ export default function RecipeBuilder() {
             <span className="step-number">2</span>
             <h2>Inoculation</h2>
           </div>
-          <div className="form-group" style={{ marginBottom: 12 }}>
-            <label>Capsule Strength</label>
-            <select
-              value={capsuleStrength}
-              onChange={(e) => setCapsuleStrength(Number(e.target.value))}
-            >
-              <option value={500000000}>500 million CFU</option>
-              <option value={1000000000}>1 billion CFU</option>
-              <option value={2000000000}>2 billion CFU</option>
-              <option value={5000000000}>5 billion CFU</option>
-              <option value={10000000000}>10 billion CFU</option>
-              <option value={50000000000}>50 billion CFU</option>
-            </select>
+
+          {/* Capsule strength as pills instead of dropdown */}
+          <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", display: "block", marginBottom: 8 }}>
+            Capsule Strength
+          </label>
+          <div className="pill-scroll">
+            {[
+              { v: 500000000, label: "500M" },
+              { v: 1000000000, label: "1B" },
+              { v: 2000000000, label: "2B" },
+              { v: 5000000000, label: "5B" },
+              { v: 10000000000, label: "10B" },
+              { v: 50000000000, label: "50B" }
+            ].map(({ v, label }) => (
+              <button
+                key={v}
+                className={`pill-btn ${capsuleStrength === v ? "active" : ""}`}
+                onClick={() => setCapsuleStrength(v)}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
-          {/* Horizontal scroll for capsule count */}
-          <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", display: "block", marginBottom: 8 }}>
+          <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", display: "block", marginTop: 16, marginBottom: 8 }}>
             Capsules
           </label>
           <div className="pill-scroll">
@@ -220,7 +355,6 @@ export default function RecipeBuilder() {
             ))}
           </div>
 
-          {/* Volume pills */}
           <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", display: "block", marginTop: 16, marginBottom: 8 }}>
             Volume
           </label>
@@ -276,7 +410,7 @@ export default function RecipeBuilder() {
         </section>
       )}
 
-      {/* Step 3: Medium Selection — horizontal swipeable */}
+      {/* Step 3: Medium Selection */}
       {strainData && (
         <section className="card">
           <div className="section-title">
@@ -321,7 +455,7 @@ export default function RecipeBuilder() {
         </section>
       )}
 
-      {/* Step 4: Optimal Parameters — circular gauges */}
+      {/* Step 4: Optimal Parameters */}
       {strainData && currentMedium && (
         <section className="card">
           <div className="section-title">
@@ -421,7 +555,7 @@ export default function RecipeBuilder() {
         </section>
       )}
 
-      {/* Step 6: Growth Simulation — arc gauge + rings */}
+      {/* Step 6: Growth Simulation */}
       {simulation && (
         <section className="card">
           <div className="section-title">
@@ -429,7 +563,6 @@ export default function RecipeBuilder() {
             <h2>Growth Results</h2>
           </div>
 
-          {/* Arc gauge — the hero visual */}
           <div className="arc-gauge-section">
             <ArcGauge
               value={formatCFU(simulation.finalCFU)}
@@ -442,7 +575,6 @@ export default function RecipeBuilder() {
             />
           </div>
 
-          {/* Mini ring indicators */}
           <div className="mini-rings-row">
             <MiniRing
               value={`${simulation.optimalDuration}h`}
@@ -472,7 +604,6 @@ export default function RecipeBuilder() {
             />
           </div>
 
-          {/* Segmented control — switch between views */}
           <div className="segmented-control">
             <button
               className={`segmented-btn ${simView === "bars" ? "active" : ""}`}
@@ -494,7 +625,6 @@ export default function RecipeBuilder() {
             </button>
           </div>
 
-          {/* Bar chart view */}
           {simView === "bars" && (
             <div className="growth-bars">
               {simulation.growthCurve.map((point) => {
@@ -520,7 +650,6 @@ export default function RecipeBuilder() {
             </div>
           )}
 
-          {/* Curve chart view */}
           {simView === "curve" && (
             <div className="chart-container">
               <GrowthChart
@@ -532,7 +661,6 @@ export default function RecipeBuilder() {
             </div>
           )}
 
-          {/* Table view */}
           {simView === "table" && (
             <div className="table-container">
               <table>
@@ -566,7 +694,6 @@ export default function RecipeBuilder() {
             </div>
           )}
 
-          {/* Additive contributions */}
           {simulation.contributions.length > 0 && (
             <div className="contributions">
               <h3>Additive Impact</h3>
@@ -596,7 +723,7 @@ export default function RecipeBuilder() {
         </section>
       )}
 
-      {/* Medium Comparison — horizontal scrollable */}
+      {/* Medium Comparison */}
       {strainData && mediumKeys.length > 1 && (
         <section className="card">
           <h2>Compare Media</h2>
