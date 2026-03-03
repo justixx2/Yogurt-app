@@ -9,6 +9,8 @@ import {
 } from "../utils/fermentation";
 import GrowthChart from "../components/GrowthChart";
 import CompatibilityBadge from "../components/CompatibilityBadge";
+import ArcGauge from "../components/ArcGauge";
+import MiniRing from "../components/MiniRing";
 
 export default function RecipeBuilder() {
   const { database, getSpeciesList, getStrainsList, getStrain } = useDatabase();
@@ -21,6 +23,7 @@ export default function RecipeBuilder() {
   const [capsuleStrength, setCapsuleStrength] = useState(2000000000);
   const [capsuleCount, setCapsuleCount] = useState(1);
   const [volumeML, setVolumeML] = useState(1000);
+  const [simView, setSimView] = useState("bars");
 
   const speciesList = getSpeciesList();
   const strainsList = selectedSpecies ? getStrainsList(selectedSpecies) : [];
@@ -418,104 +421,150 @@ export default function RecipeBuilder() {
         </section>
       )}
 
-      {/* Step 6: Growth Simulation */}
+      {/* Step 6: Growth Simulation — arc gauge + rings */}
       {simulation && (
         <section className="card">
           <div className="section-title">
             <span className="step-number">6</span>
-            <h2>Growth Simulation</h2>
+            <h2>Growth Results</h2>
           </div>
 
-          <div className="stat-row">
-            <div className="stat">
-              <span className="stat-label">Start</span>
-              <span className="stat-value">
-                {formatCFU(simulation.initialCFU)}
-              </span>
-            </div>
-            <div className="stat highlight">
-              <span className="stat-label">Final CFU</span>
-              <span className="stat-value">
-                {formatCFU(simulation.finalCFU)}
-              </span>
-            </div>
-            {selectedAdditives.length > 0 && (
-              <div className="stat">
-                <span className="stat-label">Boost</span>
-                <span className="stat-value">
-                  +{((simulation.boostFactor - 1) * 100).toFixed(0)}%
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Bar chart visualization */}
-          <h3>Growth Timeline</h3>
-          <div className="growth-bars">
-            {simulation.growthCurve.map((point) => {
-              const maxCFU = simulation.growthCurve[simulation.growthCurve.length - 1]?.cfu || 1;
-              const logMax = Math.log10(Math.max(1, maxCFU));
-              const logMin = Math.log10(Math.max(1, simulation.growthCurve[0]?.cfu || 1));
-              const logVal = Math.log10(Math.max(1, point.cfu));
-              const heightPct = Math.max(3, ((logVal - logMin) / (logMax - logMin || 1)) * 100);
-              let phase = "lag";
-              if (point.hour > simulation.lagPhaseHours + 2) phase = "log";
-              if (point.hour > strainData.fermentation.stationaryPhaseStart) phase = "stationary";
-              return (
-                <div key={point.hour} className="growth-bar-item">
-                  <div className="growth-bar-value">{formatCFU(point.cfu)}</div>
-                  <div
-                    className={`growth-bar phase-${phase}`}
-                    style={{ height: `${heightPct}%` }}
-                  ></div>
-                  <div className="growth-bar-label">{point.hour}h</div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Line chart */}
-          <div className="chart-container" style={{ marginTop: 20 }}>
-            <h3>Detailed Growth Curve</h3>
-            <GrowthChart
-              data={simulation.growthCurve}
-              comparisonData={simulation.baseCurve}
-              width={Math.min(440, typeof window !== "undefined" ? window.innerWidth - 72 : 440)}
-              height={240}
+          {/* Arc gauge — the hero visual */}
+          <div className="arc-gauge-section">
+            <ArcGauge
+              value={formatCFU(simulation.finalCFU)}
+              label="Final CFU"
+              sublabel={`from ${formatCFU(simulation.initialCFU)}`}
+              percent={Math.min(95, Math.max(10, (Math.log10(simulation.finalCFU) / Math.log10(simulation.finalCFU * 1.5)) * 100))}
+              size={220}
+              strokeWidth={16}
+              color="#10b981"
             />
           </div>
 
-          {/* Growth timeline table */}
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Est. CFU</th>
-                  <th>Phase</th>
-                </tr>
-              </thead>
-              <tbody>
-                {simulation.growthCurve.map((point) => {
-                  let phase = "Lag";
-                  if (point.hour > simulation.lagPhaseHours + 2) phase = "Log";
-                  if (point.hour > strainData.fermentation.stationaryPhaseStart)
-                    phase = "Stationary";
-                  return (
-                    <tr key={point.hour}>
-                      <td>{point.hour}h</td>
-                      <td>{formatCFU(point.cfu)}</td>
-                      <td>
-                        <span className={`phase-tag phase-${phase.toLowerCase()}`}>
-                          {phase}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          {/* Mini ring indicators */}
+          <div className="mini-rings-row">
+            <MiniRing
+              value={`${simulation.optimalDuration}h`}
+              label="Duration"
+              percent={Math.min(90, (simulation.optimalDuration / 48) * 100)}
+              color="#3b82f6"
+            />
+            <MiniRing
+              value={`${simulation.lagPhaseHours.toFixed(0)}h`}
+              label="Lag Phase"
+              percent={Math.min(90, (simulation.lagPhaseHours / 8) * 100)}
+              color="#f59e0b"
+            />
+            {selectedAdditives.length > 0 && (
+              <MiniRing
+                value={`+${((simulation.boostFactor - 1) * 100).toFixed(0)}%`}
+                label="Boost"
+                percent={Math.min(90, (simulation.boostFactor - 1) * 100 * 3)}
+                color="#8b5cf6"
+              />
+            )}
+            <MiniRing
+              value={formatCFU(simulation.initialCFU).split(" ")[0]}
+              label="Start"
+              percent={20}
+              color="#6b7280"
+            />
           </div>
+
+          {/* Segmented control — switch between views */}
+          <div className="segmented-control">
+            <button
+              className={`segmented-btn ${simView === "bars" ? "active" : ""}`}
+              onClick={() => setSimView("bars")}
+            >
+              Bars
+            </button>
+            <button
+              className={`segmented-btn ${simView === "curve" ? "active" : ""}`}
+              onClick={() => setSimView("curve")}
+            >
+              Curve
+            </button>
+            <button
+              className={`segmented-btn ${simView === "table" ? "active" : ""}`}
+              onClick={() => setSimView("table")}
+            >
+              Table
+            </button>
+          </div>
+
+          {/* Bar chart view */}
+          {simView === "bars" && (
+            <div className="growth-bars">
+              {simulation.growthCurve.map((point) => {
+                const maxCFU = simulation.growthCurve[simulation.growthCurve.length - 1]?.cfu || 1;
+                const logMax = Math.log10(Math.max(1, maxCFU));
+                const logMin = Math.log10(Math.max(1, simulation.growthCurve[0]?.cfu || 1));
+                const logVal = Math.log10(Math.max(1, point.cfu));
+                const heightPct = Math.max(3, ((logVal - logMin) / (logMax - logMin || 1)) * 100);
+                let phase = "lag";
+                if (point.hour > simulation.lagPhaseHours + 2) phase = "log";
+                if (point.hour > strainData.fermentation.stationaryPhaseStart) phase = "stationary";
+                return (
+                  <div key={point.hour} className="growth-bar-item">
+                    <div className="growth-bar-value">{formatCFU(point.cfu)}</div>
+                    <div
+                      className={`growth-bar phase-${phase}`}
+                      style={{ height: `${heightPct}%` }}
+                    ></div>
+                    <div className="growth-bar-label">{point.hour}h</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Curve chart view */}
+          {simView === "curve" && (
+            <div className="chart-container">
+              <GrowthChart
+                data={simulation.growthCurve}
+                comparisonData={simulation.baseCurve}
+                width={Math.min(440, typeof window !== "undefined" ? window.innerWidth - 72 : 440)}
+                height={240}
+              />
+            </div>
+          )}
+
+          {/* Table view */}
+          {simView === "table" && (
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Est. CFU</th>
+                    <th>Phase</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {simulation.growthCurve.map((point) => {
+                    let phase = "Lag";
+                    if (point.hour > simulation.lagPhaseHours + 2) phase = "Log";
+                    if (point.hour > strainData.fermentation.stationaryPhaseStart)
+                      phase = "Stationary";
+                    return (
+                      <tr key={point.hour}>
+                        <td>{point.hour}h</td>
+                        <td>{formatCFU(point.cfu)}</td>
+                        <td>
+                          <span className={`phase-tag phase-${phase.toLowerCase()}`}>
+                            {phase}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* Additive contributions */}
           {simulation.contributions.length > 0 && (
@@ -525,16 +574,12 @@ export default function RecipeBuilder() {
                 <div key={c.name} className="contribution-item">
                   <div className="contribution-header">
                     <strong>{c.name}</strong>
-                    <span className="boost-badge">
-                      +{c.boostPercent}%
-                    </span>
+                    <span className="boost-badge">+{c.boostPercent}%</span>
                   </div>
-                  <div className="contribution-detail">
-                    <span className={`category-tag ${c.category.replace(/[\s/]+/g, "-")}`}>
-                      {c.category}
-                    </span>
+                  <div className="progress-bar" style={{ marginTop: 6 }}>
+                    <div className="progress-fill" style={{ width: `${Math.min(100, c.boostPercent * 4)}%` }}></div>
                   </div>
-                  <div style={{ fontSize: "0.8125rem", color: "#6b7280", marginTop: 4 }}>
+                  <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 4 }}>
                     {formatCFU(c.additionalCFU)} additional CFU
                   </div>
                 </div>

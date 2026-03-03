@@ -49,9 +49,9 @@
   --radius: 14px;
   --radius-lg: 20px;
   --radius-xl: 28px;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04);
-  --shadow-lg: 0 10px 30px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 20px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.05);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
 }
 
 html {
@@ -166,23 +166,24 @@ body {
    ============================================================ */
 
 .page-header {
-  padding: 20px 20px 0;
+  padding: 24px 20px 16px;
 }
 
 .page-header h1 {
-  font-size: 1.75rem;
-  font-weight: 800;
+  font-size: 2rem;
+  font-weight: 900;
   color: var(--text-heading);
   margin: 0 0 4px 0;
-  line-height: 1.2;
-  letter-spacing: -0.5px;
+  line-height: 1.1;
+  letter-spacing: -0.8px;
 }
 
 .page-header .page-subtitle {
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: 0.875rem;
   margin: 0;
   line-height: 1.4;
+  font-weight: 500;
 }
 
 /* ============================================================
@@ -190,24 +191,24 @@ body {
    ============================================================ */
 
 h1 {
-  font-size: 1.75rem;
-  font-weight: 800;
+  font-size: 2rem;
+  font-weight: 900;
   color: var(--text-heading);
   margin: 0 0 4px 0;
-  line-height: 1.2;
-  letter-spacing: -0.5px;
+  line-height: 1.1;
+  letter-spacing: -0.8px;
 }
 
 h2 {
-  font-size: 1.125rem;
-  font-weight: 700;
+  font-size: 1.1875rem;
+  font-weight: 800;
   color: var(--text-heading);
   margin: 0 0 12px 0;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.4px;
 }
 
 h3 {
-  font-size: 0.9375rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-heading);
   margin: 16px 0 10px 0;
@@ -244,17 +245,18 @@ h3 {
 }
 
 .step-number {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent), #059669);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8125rem;
-  font-weight: 700;
+  font-size: 0.875rem;
+  font-weight: 800;
   flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
 }
 
 .section-title h2 {
@@ -268,9 +270,9 @@ h3 {
 .card {
   background: var(--bg-card);
   border-radius: var(--radius-lg);
-  padding: 20px;
+  padding: 22px;
   margin: 0 16px 16px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
 }
 
 .card-flat {
@@ -494,24 +496,25 @@ select:disabled {
 
 .pill-btn {
   flex-shrink: 0;
-  padding: 10px 20px;
+  padding: 11px 22px;
   border-radius: 50px;
   border: 2px solid var(--border);
   background: white;
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   scroll-snap-align: start;
   white-space: nowrap;
 }
 
 .pill-btn.active {
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent), #059669);
   border-color: var(--accent);
   color: white;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+  transform: scale(1.04);
 }
 
 .pill-btn:not(.active):hover {
@@ -608,6 +611,8 @@ select:disabled {
 .medium-card.selected {
   border-color: var(--accent);
   background: var(--accent-light);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.2);
+  transform: translateY(-2px);
 }
 
 .medium-header {
@@ -822,6 +827,7 @@ select:disabled {
 .additive-card.selected {
   border-color: var(--accent-green);
   background: #f0fdf4;
+  box-shadow: 0 2px 12px rgba(34, 197, 94, 0.15);
 }
 
 .additive-header {
@@ -958,10 +964,11 @@ select:disabled {
 }
 
 .stat-value {
-  font-size: 1.25rem;
-  font-weight: 800;
+  font-size: 1.375rem;
+  font-weight: 900;
   color: var(--accent);
   font-family: var(--font-sans);
+  letter-spacing: -0.5px;
 }
 
 .stat-label {
@@ -1022,15 +1029,76 @@ select:disabled {
 }
 
 /* ============================================================
+   Segmented control (pill tabs)
+   ============================================================ */
+
+.segmented-control {
+  display: flex;
+  background: var(--bg-input);
+  border-radius: 12px;
+  padding: 3px;
+  margin-bottom: 16px;
+}
+
+.segmented-btn {
+  flex: 1;
+  padding: 10px 8px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.25s;
+  text-align: center;
+}
+
+.segmented-btn.active {
+  background: white;
+  color: var(--text-heading);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+/* ============================================================
+   Arc gauge container
+   ============================================================ */
+
+.arc-gauge-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0 16px;
+}
+
+/* Mini rings row */
+.mini-rings-row {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  padding: 12px 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.mini-rings-row::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================================================
    Bar chart for growth timeline
    ============================================================ */
 
 .growth-bars {
   display: flex;
   align-items: flex-end;
-  gap: 6px;
-  height: 160px;
+  gap: 4px;
+  height: 200px;
   padding: 0 4px;
+  background: var(--bg-input);
+  border-radius: var(--radius);
+  padding: 16px 8px 8px;
 }
 
 .growth-bar-item {
@@ -1045,10 +1113,10 @@ select:disabled {
 
 .growth-bar {
   width: 100%;
-  border-radius: 6px 6px 0 0;
+  border-radius: 8px 8px 2px 2px;
   min-height: 4px;
-  transition: height 0.5s ease;
-  max-width: 36px;
+  transition: height 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  max-width: 32px;
 }
 
 .growth-bar.phase-lag {
