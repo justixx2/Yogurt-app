@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useDatabase } from "../context/DatabaseContext";
 import {
   generateGrowthCurve,
@@ -27,6 +27,33 @@ function saveRecentSpecies(species) {
   } catch {}
 }
 
+// Color palette for species backgrounds
+const SPECIES_COLORS = [
+  { bg: "#f0fdf4", border: "#bbf7d0" },
+  { bg: "#eff6ff", border: "#bfdbfe" },
+  { bg: "#fdf4ff", border: "#e9d5ff" },
+  { bg: "#fff7ed", border: "#fed7aa" },
+  { bg: "#fef2f2", border: "#fecaca" },
+  { bg: "#f0fdfa", border: "#99f6e4" },
+  { bg: "#fefce8", border: "#fef08a" },
+  { bg: "#fdf2f8", border: "#fbcfe8" },
+  { bg: "#ecfeff", border: "#a5f3fc" },
+  { bg: "#f5f3ff", border: "#c4b5fd" },
+];
+
+function getSpeciesColor(index) {
+  return SPECIES_COLORS[index % SPECIES_COLORS.length];
+}
+
+// Convert score to text rank
+function scoreToRank(score) {
+  if (score >= 90) return "Perfect";
+  if (score >= 75) return "Great";
+  if (score >= 60) return "Good";
+  if (score >= 40) return "Fair";
+  return "Poor";
+}
+
 export default function RecipeBuilder() {
   const { database, getSpeciesList, getStrainsList, getStrain } = useDatabase();
 
@@ -35,12 +62,16 @@ export default function RecipeBuilder() {
   const [selectedMedium, setSelectedMedium] = useState("");
   const [selectedAdditives, setSelectedAdditives] = useState([]);
   const [useStarter, setUseStarter] = useState(false);
-  const [capsuleStrength, setCapsuleStrength] = useState(2000000000);
+  const [cfuNumber, setCfuNumber] = useState(2);
+  const [cfuUnit, setCfuUnit] = useState("B"); // "M" or "B"
   const [capsuleCount, setCapsuleCount] = useState(1);
   const [volumeML, setVolumeML] = useState(1000);
   const [simView, setSimView] = useState("bars");
   const [searchQuery, setSearchQuery] = useState("");
   const [recentSpecies, setRecentSpecies] = useState(getRecentSpecies);
+  const [tappedBar, setTappedBar] = useState(null);
+
+  const capsuleStrength = cfuUnit === "B" ? cfuNumber * 1e9 : cfuNumber * 1e6;
 
   const speciesList = getSpeciesList();
   const strainsList = selectedSpecies ? getStrainsList(selectedSpecies) : [];
@@ -56,10 +87,8 @@ export default function RecipeBuilder() {
   const sortedSpecies = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
 
-    // Build flat list of {species, strain} for search
     let filtered = speciesList;
     if (q) {
-      // Match species name or any strain name within that species
       filtered = speciesList.filter(sp => {
         if (sp.toLowerCase().includes(q)) return true;
         const strains = getStrainsList(sp);
@@ -67,7 +96,6 @@ export default function RecipeBuilder() {
       });
     }
 
-    // Sort: recent first, then alphabetical
     const recentSet = new Set(recentSpecies);
     return [...filtered].sort((a, b) => {
       const aRecent = recentSet.has(a);
@@ -83,7 +111,6 @@ export default function RecipeBuilder() {
 
   const handleSpeciesClick = useCallback((species) => {
     if (selectedSpecies === species) {
-      // Clicking same species again deselects it
       setSelectedSpecies("");
       setSelectedStrain("");
       setSelectedMedium("");
@@ -115,7 +142,7 @@ export default function RecipeBuilder() {
     );
   };
 
-  // Growth simulation
+  // Growth simulation — starter mode now affects the growth curve properly
   const simulation = useMemo(() => {
     if (!strainData || !currentMedium) return null;
 
@@ -137,8 +164,10 @@ export default function RecipeBuilder() {
       starterNotes = adjusted.starterNotes;
     }
 
+    // Use a consistent total time window so starter vs non-starter are comparable
+    const totalHours = Math.max(ferm.optimalDuration + 12, 36);
     const timePoints = [0, 2, 4, 6, 8, 10, 12, 16, 20, 24, 30, 36, 42, 48].filter(
-      (t) => t <= Math.max(optimalDuration + 12, 36)
+      (t) => t <= totalHours
     );
 
     const growthCurve = generateGrowthCurve({
@@ -148,19 +177,20 @@ export default function RecipeBuilder() {
       stationaryPhaseStart: ferm.stationaryPhaseStart,
       maxCFUperML: ferm.maxCFUperML,
       volumeML,
-      totalHours: Math.max(optimalDuration + 12, 36),
+      totalHours,
       boostFactor,
       timePoints
     });
 
+    // Base curve: no additives AND no starter adjustment for fair comparison
     const baseCurve = generateGrowthCurve({
       initialCFU,
       doublingTimeMin: ferm.doublingTimeMinutes,
-      lagPhaseHours,
+      lagPhaseHours: ferm.lagPhase,
       stationaryPhaseStart: ferm.stationaryPhaseStart,
       maxCFUperML: ferm.maxCFUperML,
       volumeML,
-      totalHours: Math.max(optimalDuration + 12, 36),
+      totalHours,
       boostFactor: 1.0,
       timePoints
     });
@@ -174,9 +204,12 @@ export default function RecipeBuilder() {
       baseFinalCFU
     );
 
+    // Show comparison if starter is on OR additives are selected
+    const showComparison = (useStarter && ferm.starterMode) || selectedAdditives.length > 0;
+
     return {
       growthCurve,
-      baseCurve: selectedAdditives.length > 0 ? baseCurve : null,
+      baseCurve: showComparison ? baseCurve : null,
       finalCFU,
       baseFinalCFU,
       contributions,
@@ -184,7 +217,8 @@ export default function RecipeBuilder() {
       lagPhaseHours,
       optimalDuration,
       starterNotes,
-      initialCFU
+      initialCFU,
+      showComparison
     };
   }, [
     strainData,
@@ -196,7 +230,6 @@ export default function RecipeBuilder() {
     volumeML
   ]);
 
-  // Count how many strains match the search (for showing match hints)
   const getMatchingStrains = useCallback((species) => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase().trim();
@@ -213,33 +246,35 @@ export default function RecipeBuilder() {
         </p>
       </div>
 
-      {/* Search bar — always at the top */}
+      {/* Search + species list */}
       <div className="card" style={{ paddingBottom: 14 }}>
         <div className="search-box">
           <input
             type="text"
-            placeholder="Search bacteria species or strains..."
+            placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
-        {/* Species list — all visible, single tap */}
         <div className="species-pick-list">
-          {sortedSpecies.map((species) => {
+          {sortedSpecies.map((species, idx) => {
             const isSelected = selectedSpecies === species;
-            const isRecent = recentSpecies.includes(species);
             const matchingStrains = getMatchingStrains(species);
             const strains = getStrainsList(species);
+            const color = getSpeciesColor(idx);
 
             return (
               <div key={species} className="species-pick-group">
                 <button
                   className={`species-pick-btn ${isSelected ? "active" : ""}`}
                   onClick={() => handleSpeciesClick(species)}
+                  style={{
+                    background: isSelected ? color.bg : undefined,
+                    borderLeft: `3px solid ${color.border}`
+                  }}
                 >
                   <div className="species-pick-left">
-                    {isRecent && <span className="recent-dot"></span>}
                     <span className="species-pick-name">{species}</span>
                   </div>
                   <div className="species-pick-right">
@@ -250,7 +285,6 @@ export default function RecipeBuilder() {
                   </div>
                 </button>
 
-                {/* Strain pills — visible when species is selected */}
                 {isSelected && strains.length > 0 && (
                   <div className="strain-pills">
                     {strains.map((strain) => (
@@ -265,7 +299,6 @@ export default function RecipeBuilder() {
                   </div>
                 )}
 
-                {/* Show matching strains hint when searching */}
                 {!isSelected && matchingStrains.length > 0 && (
                   <div className="strain-match-hint">
                     Matches: {matchingStrains.join(", ")}
@@ -283,33 +316,7 @@ export default function RecipeBuilder() {
         </div>
       </div>
 
-      {/* Selected bacteria summary */}
-      {strainData && (
-        <div className="card" style={{ padding: "14px 22px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div>
-            <div style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-              Selected
-            </div>
-            <div style={{ fontWeight: 800, fontSize: "1rem", color: "#1a1d26" }}>
-              {selectedStrain}
-            </div>
-            <div style={{ fontSize: "0.75rem", fontStyle: "italic", color: "#6b7280" }}>
-              {selectedSpecies}
-            </div>
-          </div>
-          <div style={{
-            width: 40, height: 40, borderRadius: "50%",
-            background: "linear-gradient(135deg, #10b981, #059669)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            color: "white", fontWeight: 900, fontSize: "1.125rem",
-            boxShadow: "0 2px 8px rgba(16,185,129,0.3)"
-          }}>
-            {selectedStrain.charAt(0)}
-          </div>
-        </div>
-      )}
-
-      {/* Step 2: Inoculation Settings */}
+      {/* Step 2: Inoculation — merged, no separate "Selected" card */}
       {strainData && (
         <section className="card">
           <div className="section-title">
@@ -317,27 +324,33 @@ export default function RecipeBuilder() {
             <h2>Inoculation</h2>
           </div>
 
-          {/* Capsule strength as pills instead of dropdown */}
+          {/* Manual CFU input with M/B toggle */}
           <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", display: "block", marginBottom: 8 }}>
-            Capsule Strength
+            CFU per Capsule
           </label>
-          <div className="pill-scroll">
-            {[
-              { v: 500000000, label: "500M" },
-              { v: 1000000000, label: "1B" },
-              { v: 2000000000, label: "2B" },
-              { v: 5000000000, label: "5B" },
-              { v: 10000000000, label: "10B" },
-              { v: 50000000000, label: "50B" }
-            ].map(({ v, label }) => (
+          <div className="cfu-input-row">
+            <input
+              type="number"
+              min="1"
+              max="999"
+              value={cfuNumber}
+              onChange={(e) => setCfuNumber(Math.max(1, Number(e.target.value) || 1))}
+              className="cfu-number-input"
+            />
+            <div className="cfu-unit-toggle">
               <button
-                key={v}
-                className={`pill-btn ${capsuleStrength === v ? "active" : ""}`}
-                onClick={() => setCapsuleStrength(v)}
+                className={`cfu-unit-btn ${cfuUnit === "M" ? "active" : ""}`}
+                onClick={() => setCfuUnit("M")}
               >
-                {label}
+                Million
               </button>
-            ))}
+              <button
+                className={`cfu-unit-btn ${cfuUnit === "B" ? "active" : ""}`}
+                onClick={() => setCfuUnit("B")}
+              >
+                Billion
+              </button>
+            </div>
           </div>
 
           <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", display: "block", marginTop: 16, marginBottom: 8 }}>
@@ -410,45 +423,34 @@ export default function RecipeBuilder() {
         </section>
       )}
 
-      {/* Step 3: Medium Selection */}
+      {/* Step 3: Medium Selection — compact grid, no swipe needed */}
       {strainData && (
         <section className="card">
           <div className="section-title">
             <span className="step-number">3</span>
             <h2>Fermentation Medium</h2>
           </div>
-          <div className="swipe-hint">
-            <span className="swipe-hint-arrow">&larr;</span> Swipe to browse
-          </div>
-          <div className="medium-scroll">
+          <div className="medium-compact-grid">
             {mediumKeys.map((key) => {
               const medium = mediumProfiles[key];
               return (
                 <button
                   key={key}
-                  className={`medium-card ${selectedMedium === key ? "selected" : ""}`}
+                  className={`medium-compact-card ${selectedMedium === key ? "selected" : ""}`}
                   onClick={() => handleMediumChange(key)}
                 >
-                  <div className="medium-header">
-                    <span className="medium-name">{medium.name}</span>
-                  </div>
-                  <CompatibilityBadge status={medium.compatibility} />
-                  <div className="medium-ph">
-                    pH {medium.initialPH} &rarr; {medium.finalPH}
-                  </div>
-                  <div className="medium-score">
-                    {medium.compatibilityScore}/100
-                  </div>
-                  <div className="progress-bar" style={{ marginTop: 4 }}>
-                    <div className="progress-fill" style={{ width: `${medium.compatibilityScore}%` }}></div>
-                  </div>
+                  <span className="medium-compact-name">{medium.name}</span>
+                  <span className="medium-compact-rank">{scoreToRank(medium.compatibilityScore)}</span>
+                  <span className="medium-compact-ph">
+                    pH {medium.initialPH}&rarr;{medium.finalPH}
+                  </span>
                 </button>
               );
             })}
           </div>
 
           {currentMedium && (
-            <div className="info-box">
+            <div className="info-box" style={{ marginTop: 12 }}>
               <p>{currentMedium.explanation}</p>
             </div>
           )}
@@ -575,25 +577,31 @@ export default function RecipeBuilder() {
             />
           </div>
 
-          <div className="mini-rings-row">
+          <div className="mini-rings-row" style={{ flexWrap: "wrap" }}>
             <MiniRing
               value={`${simulation.optimalDuration}h`}
               label="Duration"
               percent={Math.min(90, (simulation.optimalDuration / 48) * 100)}
               color="#3b82f6"
+              size={50}
+              strokeWidth={4}
             />
             <MiniRing
               value={`${simulation.lagPhaseHours.toFixed(0)}h`}
-              label="Lag Phase"
+              label="Lag"
               percent={Math.min(90, (simulation.lagPhaseHours / 8) * 100)}
               color="#f59e0b"
+              size={50}
+              strokeWidth={4}
             />
-            {selectedAdditives.length > 0 && (
+            {simulation.showComparison && (
               <MiniRing
                 value={`+${((simulation.boostFactor - 1) * 100).toFixed(0)}%`}
                 label="Boost"
                 percent={Math.min(90, (simulation.boostFactor - 1) * 100 * 3)}
                 color="#8b5cf6"
+                size={50}
+                strokeWidth={4}
               />
             )}
             <MiniRing
@@ -601,6 +609,8 @@ export default function RecipeBuilder() {
               label="Start"
               percent={20}
               color="#6b7280"
+              size={50}
+              strokeWidth={4}
             />
           </div>
 
@@ -625,20 +635,32 @@ export default function RecipeBuilder() {
             </button>
           </div>
 
+          {/* Bars — only show first/last CFU label, tap for others */}
           {simView === "bars" && (
             <div className="growth-bars">
-              {simulation.growthCurve.map((point) => {
-                const maxCFU = simulation.growthCurve[simulation.growthCurve.length - 1]?.cfu || 1;
+              {simulation.growthCurve.map((point, i) => {
+                const curve = simulation.growthCurve;
+                const maxCFU = curve[curve.length - 1]?.cfu || 1;
                 const logMax = Math.log10(Math.max(1, maxCFU));
-                const logMin = Math.log10(Math.max(1, simulation.growthCurve[0]?.cfu || 1));
+                const logMin = Math.log10(Math.max(1, curve[0]?.cfu || 1));
                 const logVal = Math.log10(Math.max(1, point.cfu));
                 const heightPct = Math.max(3, ((logVal - logMin) / (logMax - logMin || 1)) * 100);
                 let phase = "lag";
                 if (point.hour > simulation.lagPhaseHours + 2) phase = "log";
                 if (point.hour > strainData.fermentation.stationaryPhaseStart) phase = "stationary";
+                const isFirst = i === 0;
+                const isLast = i === curve.length - 1;
+                const isTapped = tappedBar === point.hour;
+                const showLabel = isFirst || isLast || isTapped;
                 return (
-                  <div key={point.hour} className="growth-bar-item">
-                    <div className="growth-bar-value">{formatCFU(point.cfu)}</div>
+                  <div
+                    key={point.hour}
+                    className="growth-bar-item"
+                    onClick={() => setTappedBar(isTapped ? null : point.hour)}
+                  >
+                    {showLabel && (
+                      <div className="growth-bar-value">{formatCFU(point.cfu)}</div>
+                    )}
                     <div
                       className={`growth-bar phase-${phase}`}
                       style={{ height: `${heightPct}%` }}
@@ -720,50 +742,6 @@ export default function RecipeBuilder() {
               <p>{simulation.starterNotes}</p>
             </div>
           )}
-        </section>
-      )}
-
-      {/* Medium Comparison */}
-      {strainData && mediumKeys.length > 1 && (
-        <section className="card">
-          <h2>Compare Media</h2>
-          <div className="swipe-hint">
-            <span className="swipe-hint-arrow">&larr;</span> Swipe to compare
-          </div>
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Medium</th>
-                  <th>Score</th>
-                  <th>pH</th>
-                  <th>Add.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mediumKeys.map((key) => {
-                  const m = mediumProfiles[key];
-                  return (
-                    <tr
-                      key={key}
-                      className={selectedMedium === key ? "row-selected" : ""}
-                      onClick={() => handleMediumChange(key)}
-                      style={{ cursor: "pointer" }}
-                    >
-                      <td style={{ fontWeight: 600 }}>{m.name}</td>
-                      <td>
-                        <span style={{ fontWeight: 700, color: "#10b981" }}>
-                          {m.compatibilityScore}
-                        </span>
-                      </td>
-                      <td>{m.initialPH} &rarr; {m.finalPH}</td>
-                      <td>{m.additives?.length || 0}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
         </section>
       )}
     </div>

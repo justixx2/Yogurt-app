@@ -2,8 +2,9 @@ import { useRef, useEffect } from "react";
 import { formatCFU } from "../utils/fermentation";
 
 /**
- * Canvas-based growth curve chart — premium app style with
- * gradient fills, smooth curves, and bold visuals.
+ * Canvas-based growth curve chart — premium app style.
+ * When comparison data exists, fills the area between curves to
+ * make the difference visually obvious.
  */
 export default function GrowthChart({ data, width = 440, height = 260, comparisonData = null }) {
   const canvasRef = useRef(null);
@@ -23,10 +24,9 @@ export default function GrowthChart({ data, width = 440, height = 260, compariso
     const chartW = width - padding.left - padding.right;
     const chartH = height - padding.top - padding.bottom;
 
-    // Clear
     ctx.clearRect(0, 0, width, height);
 
-    // Background — premium card with subtle gradient
+    // Background
     const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
     bgGrad.addColorStop(0, "#ffffff");
     bgGrad.addColorStop(1, "#f5f6fa");
@@ -34,32 +34,37 @@ export default function GrowthChart({ data, width = 440, height = 260, compariso
     roundRect(ctx, 0, 0, width, height, 16);
     ctx.fill();
 
-    // Subtle border
     ctx.strokeStyle = "rgba(0,0,0,0.04)";
     ctx.lineWidth = 1;
     roundRect(ctx, 0.5, 0.5, width - 1, height - 1, 16);
     ctx.stroke();
 
-    // Data ranges
+    // Data ranges — use LINEAR scale when comparing to show difference better
     const allData = comparisonData ? [...data, ...comparisonData] : data;
     const maxHour = Math.max(...allData.map((d) => d.hour));
     const maxCFU = Math.max(...allData.map((d) => d.cfu));
-    const minLog = Math.log10(Math.max(1, Math.min(...allData.map((d) => d.cfu))));
-    const maxLog = Math.log10(Math.max(1, maxCFU));
+    const minCFU = Math.min(...allData.map((d) => d.cfu));
+
+    // Use linear scale when comparing (shows difference much better than log)
+    const useLinear = !!comparisonData;
 
     const xScale = (h) => padding.left + (h / maxHour) * chartW;
     const yScale = (cfu) => {
+      if (useLinear) {
+        const normalized = (cfu - minCFU) / (maxCFU - minCFU || 1);
+        return padding.top + chartH * (1 - normalized);
+      }
+      const minLog = Math.log10(Math.max(1, minCFU));
+      const maxLog = Math.log10(Math.max(1, maxCFU));
       const logVal = Math.log10(Math.max(1, cfu));
       const normalized = (logVal - minLog) / (maxLog - minLog || 1);
       return padding.top + chartH * (1 - normalized);
     };
 
-    // Grid lines — very subtle
-    const logSteps = 5;
-    for (let i = 0; i <= logSteps; i++) {
-      const logVal = minLog + (i / logSteps) * (maxLog - minLog);
-      const y = padding.top + chartH * (1 - i / logSteps);
-
+    // Grid
+    const steps = 5;
+    for (let i = 0; i <= steps; i++) {
+      const y = padding.top + chartH * (1 - i / steps);
       ctx.beginPath();
       ctx.strokeStyle = i === 0 ? "#e2e6ef" : "rgba(0,0,0,0.04)";
       ctx.lineWidth = 1;
@@ -67,13 +72,20 @@ export default function GrowthChart({ data, width = 440, height = 260, compariso
       ctx.lineTo(padding.left + chartW, y);
       ctx.stroke();
 
+      let val;
+      if (useLinear) {
+        val = minCFU + (i / steps) * (maxCFU - minCFU);
+      } else {
+        const minLog = Math.log10(Math.max(1, minCFU));
+        const maxLog = Math.log10(Math.max(1, maxCFU));
+        val = Math.pow(10, minLog + (i / steps) * (maxLog - minLog));
+      }
       ctx.fillStyle = "#9ca3af";
       ctx.font = "600 8px -apple-system, 'SF Pro Display', sans-serif";
       ctx.textAlign = "right";
-      ctx.fillText(formatCFU(Math.pow(10, logVal)), padding.left - 8, y + 3);
+      ctx.fillText(formatCFU(val), padding.left - 8, y + 3);
     }
 
-    // Vertical grid — time markers
     const hourStep = maxHour <= 24 ? 4 : maxHour <= 36 ? 6 : 8;
     for (let h = 0; h <= maxHour; h += hourStep) {
       const x = xScale(h);
@@ -90,48 +102,97 @@ export default function GrowthChart({ data, width = 440, height = 260, compariso
       ctx.fillText(`${h}h`, x, padding.top + chartH + 18);
     }
 
-    // Axis label
     ctx.fillStyle = "#9ca3af";
     ctx.font = "600 9px -apple-system, 'SF Pro Display', sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("Time (hours)", padding.left + chartW / 2, height - 6);
 
-    // Rich gradient fill under main curve
-    if (data.length >= 2) {
-      const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartH);
-      gradient.addColorStop(0, "rgba(16, 185, 129, 0.25)");
-      gradient.addColorStop(0.5, "rgba(16, 185, 129, 0.08)");
-      gradient.addColorStop(1, "rgba(16, 185, 129, 0.01)");
+    // If comparison: fill the area BETWEEN the two curves to highlight difference
+    if (comparisonData && comparisonData.length >= 2 && data.length >= 2) {
+      const mainPts = data.map(d => ({ x: xScale(d.hour), y: yScale(d.cfu) }));
+      const basePts = comparisonData.map(d => ({ x: xScale(d.hour), y: yScale(d.cfu) }));
+
+      // Fill between: green where main > base
+      const diffGrad = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartH);
+      diffGrad.addColorStop(0, "rgba(16, 185, 129, 0.3)");
+      diffGrad.addColorStop(1, "rgba(16, 185, 129, 0.08)");
 
       ctx.beginPath();
-      ctx.moveTo(xScale(data[0].hour), padding.top + chartH);
-
-      // Smooth curve using cardinal spline
-      const pts = data.map(d => ({ x: xScale(d.hour), y: yScale(d.cfu) }));
-      ctx.lineTo(pts[0].x, pts[0].y);
-      for (let i = 0; i < pts.length - 1; i++) {
-        const p0 = pts[Math.max(0, i - 1)];
-        const p1 = pts[i];
-        const p2 = pts[i + 1];
-        const p3 = pts[Math.min(pts.length - 1, i + 2)];
-        const cp1x = p1.x + (p2.x - p0.x) / 6;
-        const cp1y = p1.y + (p2.y - p0.y) / 6;
-        const cp2x = p2.x - (p3.x - p1.x) / 6;
-        const cp2y = p2.y - (p3.y - p1.y) / 6;
-        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+      // Trace main curve forward
+      ctx.moveTo(mainPts[0].x, mainPts[0].y);
+      for (let i = 0; i < mainPts.length - 1; i++) {
+        const p0 = mainPts[Math.max(0, i - 1)];
+        const p1 = mainPts[i];
+        const p2 = mainPts[i + 1];
+        const p3 = mainPts[Math.min(mainPts.length - 1, i + 2)];
+        ctx.bezierCurveTo(
+          p1.x + (p2.x - p0.x) / 6, p1.y + (p2.y - p0.y) / 6,
+          p2.x - (p3.x - p1.x) / 6, p2.y - (p3.y - p1.y) / 6,
+          p2.x, p2.y
+        );
       }
-      ctx.lineTo(xScale(data[data.length - 1].hour), padding.top + chartH);
+      // Trace base curve backward
+      for (let i = basePts.length - 2; i >= 0; i--) {
+        const p0 = basePts[Math.min(basePts.length - 1, i + 2)];
+        const p1 = basePts[i + 1];
+        const p2 = basePts[i];
+        const p3 = basePts[Math.max(0, i - 1)];
+        ctx.bezierCurveTo(
+          p1.x + (p2.x - p0.x) / 6, p1.y + (p2.y - p0.y) / 6,
+          p2.x - (p3.x - p1.x) / 6, p2.y - (p3.y - p1.y) / 6,
+          p2.x, p2.y
+        );
+      }
       ctx.closePath();
-      ctx.fillStyle = gradient;
+      ctx.fillStyle = diffGrad;
       ctx.fill();
+
+      // Draw base curve — thick dashed orange
+      drawSmoothLine(ctx, comparisonData, xScale, yScale, "#f59e0b", 2.5, true);
+
+      // Draw base data points
+      for (const point of comparisonData) {
+        const x = xScale(point.hour);
+        const y = yScale(point.cfu);
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+        ctx.strokeStyle = "#f59e0b";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    } else {
+      // Single curve: gradient fill under
+      if (data.length >= 2) {
+        const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartH);
+        gradient.addColorStop(0, "rgba(16, 185, 129, 0.25)");
+        gradient.addColorStop(0.5, "rgba(16, 185, 129, 0.08)");
+        gradient.addColorStop(1, "rgba(16, 185, 129, 0.01)");
+
+        ctx.beginPath();
+        ctx.moveTo(xScale(data[0].hour), padding.top + chartH);
+        const pts = data.map(d => ({ x: xScale(d.hour), y: yScale(d.cfu) }));
+        ctx.lineTo(pts[0].x, pts[0].y);
+        for (let i = 0; i < pts.length - 1; i++) {
+          const p0 = pts[Math.max(0, i - 1)];
+          const p1 = pts[i];
+          const p2 = pts[i + 1];
+          const p3 = pts[Math.min(pts.length - 1, i + 2)];
+          ctx.bezierCurveTo(
+            p1.x + (p2.x - p0.x) / 6, p1.y + (p2.y - p0.y) / 6,
+            p2.x - (p3.x - p1.x) / 6, p2.y - (p3.y - p1.y) / 6,
+            p2.x, p2.y
+          );
+        }
+        ctx.lineTo(xScale(data[data.length - 1].hour), padding.top + chartH);
+        ctx.closePath();
+        ctx.fillStyle = gradient;
+        ctx.fill();
+      }
     }
 
-    // Comparison line (dashed, dimmed)
-    if (comparisonData && comparisonData.length > 0) {
-      drawSmoothLine(ctx, comparisonData, xScale, yScale, "#d1d5db", 1.5, true);
-    }
-
-    // Main data line — bold with glow
+    // Main line with glow
     ctx.shadowColor = "rgba(16, 185, 129, 0.3)";
     ctx.shadowBlur = 8;
     ctx.shadowOffsetY = 2;
@@ -140,19 +201,14 @@ export default function GrowthChart({ data, width = 440, height = 260, compariso
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
 
-    // Data points — premium style with white fill and colored border
-    for (let i = 0; i < data.length; i++) {
-      const point = data[i];
+    // Main data points
+    for (const point of data) {
       const x = xScale(point.hour);
       const y = yScale(point.cfu);
-
-      // Outer glow
       ctx.beginPath();
       ctx.arc(x, y, 6, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(16, 185, 129, 0.12)";
       ctx.fill();
-
-      // White dot with green border
       ctx.beginPath();
       ctx.arc(x, y, 3.5, 0, Math.PI * 2);
       ctx.fillStyle = "#ffffff";
@@ -162,29 +218,33 @@ export default function GrowthChart({ data, width = 440, height = 260, compariso
       ctx.stroke();
     }
 
-    // Legend — pill style
+    // Legend
     if (comparisonData) {
       const lx = padding.left + 6;
       const ly = padding.top + 4;
 
-      // With additives pill
-      ctx.fillStyle = "rgba(16, 185, 129, 0.1)";
-      roundRect(ctx, lx, ly, 100, 18, 9);
+      ctx.fillStyle = "rgba(16, 185, 129, 0.12)";
+      roundRect(ctx, lx, ly, 108, 18, 9);
       ctx.fill();
       ctx.fillStyle = "#10b981";
       ctx.fillRect(lx + 8, ly + 7, 12, 3);
       ctx.fillStyle = "#374151";
       ctx.font = "700 8px -apple-system, sans-serif";
       ctx.textAlign = "left";
-      ctx.fillText("With additives", lx + 24, ly + 12);
+      ctx.fillText("With boost", lx + 24, ly + 12);
 
-      // Base pill
-      ctx.fillStyle = "rgba(0,0,0,0.04)";
+      ctx.fillStyle = "rgba(245, 158, 11, 0.12)";
       roundRect(ctx, lx, ly + 22, 52, 18, 9);
       ctx.fill();
-      ctx.fillStyle = "#d1d5db";
-      ctx.fillRect(lx + 8, ly + 29, 12, 3);
-      ctx.fillStyle = "#9ca3af";
+      ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = "#f59e0b";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(lx + 8, ly + 31);
+      ctx.lineTo(lx + 20, ly + 31);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#92400e";
       ctx.fillText("Base", lx + 24, ly + 34);
     }
   }, [data, comparisonData, width, height]);
@@ -210,23 +270,22 @@ function drawSmoothLine(ctx, points, xScale, yScale, color, lineWidth, dashed) {
   ctx.lineWidth = lineWidth;
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  if (dashed) ctx.setLineDash([5, 4]);
+  if (dashed) ctx.setLineDash([6, 4]);
   else ctx.setLineDash([]);
 
   const pts = points.map(d => ({ x: xScale(d.hour), y: yScale(d.cfu) }));
   ctx.moveTo(pts[0].x, pts[0].y);
 
-  // Cardinal spline interpolation for smooth curves
   for (let i = 0; i < pts.length - 1; i++) {
     const p0 = pts[Math.max(0, i - 1)];
     const p1 = pts[i];
     const p2 = pts[i + 1];
     const p3 = pts[Math.min(pts.length - 1, i + 2)];
-    const cp1x = p1.x + (p2.x - p0.x) / 6;
-    const cp1y = p1.y + (p2.y - p0.y) / 6;
-    const cp2x = p2.x - (p3.x - p1.x) / 6;
-    const cp2y = p2.y - (p3.y - p1.y) / 6;
-    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+    ctx.bezierCurveTo(
+      p1.x + (p2.x - p0.x) / 6, p1.y + (p2.y - p0.y) / 6,
+      p2.x - (p3.x - p1.x) / 6, p2.y - (p3.y - p1.y) / 6,
+      p2.x, p2.y
+    );
   }
 
   ctx.stroke();
